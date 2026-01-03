@@ -189,3 +189,4 @@ memory.db
 /docs_ez
 /.vscode
 /.cursor
+/jupytext.toml
