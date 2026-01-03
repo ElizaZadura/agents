@@ -19,7 +19,7 @@ def get_all_share_prices_polygon_eod() -> dict[str, float]:
     results = client.get_grouped_daily_aggs(last_close, adjusted=True, include_otc=False)
 ```
 
-The cutoff of 'get\_previous\_close\_agg'  is UTC time.  'get\_grouped\_daily\_aggs' is checking using trading date which is NYC time. There is 4 or 5 hours lag depending upon if daylight saving is involved (Currently it's 5 hours lag/ gap).
+The cutoff of 'get\_previous\_close\_agg'  is UTC time.  'get\_grouped\_daily\_aggs' is checking using a trading date which is NYC time. There is 4 or 5 hours lag depending upon if daylight saving is involved (Currently it's 5 hours lag/ gap).
 
 Before Jan 1, 2026, 0:00am UTC time (Dec. 31, 2025, 7:00pm New-York time) , I got the followings in 'get\_previous\_close\_agg' call
 
@@ -58,9 +58,9 @@ Subtract 1 day only if `last_close` and `today_ny` is the same date.  That falls
 2) during the 5 hour gap
 3) after a new trading date start in N.Y.
 
-### `get_share_price` kept getting 'market' table does not exist error if I deleted account.db
+### `get_share_price` kept getting 'market' table does not exist error after I deleted account.db
 
-`with sqlite3.connect(DB) as conn` in the front of database.py is supposed to execute before I call any function/ def in database.py.  It did not. I kept getting that error. The funny thing is that account.db was created after the call but just not before `get_share_price` call.  I added `class` and `__init__` to ensure tables were created before any functions.  Yes, market.py, accounts.py and tracers.py all initialize Database first.
+`with sqlite3.connect(DB) as conn` in the front of 'database.py' is supposed to execute before I call any function/ def in database.py.  It did not. I kept getting that error. The funny thing is that account.db was created after the call but just not before `get_share_price` call.  I added `class` and `__init__` to ensure tables were created before any functions.  Yes, market.py, accounts.py and tracers.py all initialize Database object first.
 
 ```
 class Database:
@@ -93,7 +93,7 @@ I kept getting the above errors in multiple 'trader' logs.  10 is the default ma
 await Runner.run(self.agent, message, max_turns=MAX_TURNS)
 ```
 
-**The above only regulates 'trader' agent but not 'researcher` agent**  Runner is not running 'researcher' agent directly and 'researcher' agent run indirectly as a tool for 'trader' agent.  We can regulate the max_turn on the tool.
+**The above only regulates 'trader' agent but not 'researcher` agent.**  Runner is not running 'researcher' agent directly and 'researcher' agent run indirectly as a tool for 'trader' agent.  We can regulate the max_turn on the tool.
 
 ```
 async def get_researcher_tool(mcp_servers, model_name) -> Tool:
