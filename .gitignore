@@ -191,3 +191,4 @@ memory.db
 /.cursor
 /jupytext.toml
 /.cursor/plans
+/ez
