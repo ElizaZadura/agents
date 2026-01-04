@@ -190,3 +190,4 @@ memory.db
 /.vscode
 /.cursor
 /jupytext.toml
+/.cursor/plans
