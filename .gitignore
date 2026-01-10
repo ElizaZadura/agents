@@ -192,3 +192,4 @@ memory.db
 /jupytext.toml
 /.cursor/plans
 /ez
+/.specstory
