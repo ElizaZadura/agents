@@ -1,26 +1,39 @@
 spec_intake:
   description: >
     You are given the following product specification:
-
     {spec}
-
     Your task is to interpret this specification without implementing or
     designing the system.
-
     Convert the input into a structured Spec Pack.
     Do not invent requirements.
     Do not design architecture.
     Do not write code.
-
     If something is unclear, list it explicitly instead of guessing.
   expected_output: >
-    A Spec Pack with the following sections:
-
-    - Functional requirements (bullet points)
-    - Non-functional constraints (bullet points)
-    - Acceptance criteria (testable bullet points)
-    - Out of scope (bullet points)
-    - Open questions (bullet points)
-
-    No other sections.
+    Return a JSON object with EXACT keys:
+    functional_requirements, non_functional_constraints,
+    acceptance_criteria, out_of_scope, open_questions.
+    Each value must be an array of strings.
+    Do not include any other keys or values.
   agent: engineering_lead
+
+architecture_and_contracts:
+  description: >
+    You are given an approved SpecPack (structured requirements).
+
+    Your task is to design the system architecture and contracts ONLY.
+    Do not implement features. Do not write full code files.
+
+    Produce:
+    - a modular package breakdown (domain / services / ui / infra)
+    - explicit interfaces/contracts between modules
+    - data model outline
+    - ownership map (which agent owns which module in implementation)
+    - a work plan (implementation tasks + test tasks)
+    - a list of risks / assumptions / remaining questions (if any)
+
+    If the SpecPack is insufficient to define stable contracts, raise it explicitly.
+  expected_output: >
+    Return JSON ONLY matching the DesignPack schema exactly.
+    No markdown. No prose.
+  agent: core_domain_engineer

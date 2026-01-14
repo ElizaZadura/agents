@@ -7,7 +7,9 @@ This document captures the *current agreed plan* for building a **spec-driven, m
 ---
 
 ## Goal
+
 Build a reusable CrewAI crew that:
+
 - Accepts an **arbitrary product specification** as input
 - Transforms it into a structured plan
 - Delegates work across specialist agents
@@ -19,6 +21,7 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ## Core Principles
+
 - **Spec-driven**: The team is built to handle unknown specs.
 - **Contract-first**: No building before interfaces/contracts exist.
 - **Strict ownership**: Each agent owns a specific area.
@@ -30,22 +33,26 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ## Agents (Current)
 
 ### 1. Engineering Lead
+
 - Owns: scope, delegation, gates, integration
 - Converts raw specs into structured artifacts
 - Approves or rejects work
 - Does not implement features unless necessary
 
 ### 2. Core Domain Engineer
+
 - Owns: domain logic and invariants
 - Works strictly within approved contracts
 - No UI or infrastructure decisions
 
 ### 3. UI Engineer
+
 - Owns: UI layer (e.g. Gradio)
 - Implements against domain contracts
 - Keeps UI thin and explicit
 
 ### 4. Test / Infrastructure Engineer
+
 - Owns: tests, dependencies, run instructions
 - Defines what “done” means in verifiable terms
 - Surfaces missing or optional dependencies
@@ -57,11 +64,13 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ## Task Flow (Initial)
 
 ### Task 1 — Spec Intake & Framing
+
 **Owner:** Engineering Lead
 
 **Input:** `{spec}` (plain text product specification)
 
 **Output:** A *Spec Pack* with fixed sections:
+
 - Functional requirements
 - Non-functional constraints
 - Acceptance criteria
@@ -73,9 +82,11 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ### Task 2 — Architecture & Contracts *(planned next)*
+
 **Consumes:** Spec Pack
 
 **Produces:**
+
 - Module breakdown
 - Ownership assignments
 - Interface / contract definitions
@@ -85,6 +96,7 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ### Task 3 — Implementation *(planned)*
+
 - Parallel work by specialists
 - Implementation strictly follows contracts
 - Tests written alongside code
@@ -92,6 +104,7 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ### Task 4 — Review & Integration *(planned)*
+
 - Lead verifies:
   - Code runs
   - Tests pass
@@ -101,6 +114,7 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ## Modularity Requirements
+
 (Default layout, subject to refinement)
 
 - `src/<appname>/domain/`
@@ -114,6 +128,7 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ## What We Are *Not* Doing Yet
+
 - No advanced planning features
 - No tool overload
 - No domain-specific assumptions
@@ -122,6 +137,7 @@ The focus is **workflow, delegation, and cooperation**, not feature complexity.
 ---
 
 ## Next Step
+
 Define **Task 2: Architecture & Contracts** in `tasks.yaml`, following the same minimal CrewAI pattern as Task 1.
 
 ---
