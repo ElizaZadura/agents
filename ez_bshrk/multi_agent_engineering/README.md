@@ -1,54 +1,86 @@
-# MultiAgentEngineering Crew
+# MultiAgentEngineering (spec-driven, phase-gated crew)
 
-Welcome to the MultiAgentEngineering Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+This project is a **spec-driven engineering pipeline** built with [crewAI](https://crewai.com).
 
-## Installation
+It runs a phase-gated workflow:
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+- `spec_intake` → `SpecPack`
+- `design` → `DesignPack`
+- `plan_execution` → `BuildPlan` (max 3 tasks)
+- dynamic implementation tasks → `FileManifest`s → applied into an output folder
 
-First, if you haven't already, install uv:
+## Setup
 
-```bash
-pip install uv
-```
+- **Python**: >=3.10 <3.14
+- **Dependencies**: this project is intended to be run via CrewAI’s project tooling
 
-Next, navigate to your project directory and install the dependencies:
+Put your API key in the project root `.env` (this repo loads it with override semantics to avoid stale keys winning):
 
-(Optional) Lock the dependencies and install them by using the CLI command:
+- `OPENAI_API_KEY=...`
+
+Install dependencies:
+
 ```bash
 crewai install
 ```
-### Customizing
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
+## Running
 
-- Modify `src/multi_agent_engineering/config/agents.yaml` to define your agents
-- Modify `src/multi_agent_engineering/config/tasks.yaml` to define your tasks
-- Modify `src/multi_agent_engineering/crew.py` to add your own logic, tools and specific args
-- Modify `src/multi_agent_engineering/main.py` to add custom inputs for your agents and tasks
+### 1) Provide a spec file
 
-## Running the Project
+This project expects a **separate spec file**. Easiest option:
 
-To kickstart your crew of AI agents and begin task execution, run this from the root folder of your project:
+- create `spec.md` in the project root (this repo already includes one you can edit)
+
+Other options:
+
+- set `SPEC_FILE=/path/to/spec.md` in your environment
+
+### 2) Run the crew
+
+From this folder:
 
 ```bash
-$ crewai run
+crewai run
 ```
 
-This command initializes the multi_agent_engineering Crew, assembling the agents and assigning them tasks as defined in your configuration.
+## Outputs (artifacts)
 
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
+Each run creates a timestamped folder under:
 
-## Understanding Your Crew
+- `artifacts/<run_id>/`
 
-The multi_agent_engineering Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
+Expected files include:
 
-## Support
+- `spec.md` (copied input)
+- `spec_pack.json`
+- `design_pack.json`
+- `build_plan.json`
+- `callbacks.log.jsonl` (one JSON line per dynamic task)
+- `manifests/*.json` (dynamic task outputs)
+- `generated_app/` (applied `FileManifest`s)
 
-For support, questions, or feedback regarding the MultiAgentEngineering Crew or crewAI.
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
+## Cost control (model pinning)
 
-Let's create wonders together with the power and simplicity of crewAI.
+Agent models are pinned in:
+
+- `src/multi_agent_engineering/config/agents.yaml`
+
+Currently set to:
+
+- `llm: gpt-4o-mini`
+
+## Troubleshooting
+
+### 401 “invalid_api_key” but the key is valid
+
+This usually means a **stale** `OPENAI_API_KEY` was already set in your shell and was not being overridden.
+This project loads `.env` with override semantics; confirm your `.env` is correct in this folder and re-run.
+
+## Summary of steps taken (high level)
+
+- Added **Pydantic output schemas** for `DesignPack`, `BuildPlan`, and `FileManifest`.
+- Updated **agent/task config** to match the phase-gated workflow and pinned models to `gpt-4o-mini`.
+- Made the runner **spec-file driven** and added robust `.env` loading (override to avoid stale keys).
+- Implemented an **artifacts pipeline** that writes `spec_pack.json`, `design_pack.json`, `build_plan.json`, plus callback logs.
+- Added **dynamic task execution** from `BuildPlan` producing `FileManifest`s, and applied manifests into `artifacts/<run_id>/generated_app/`.
