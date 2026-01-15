@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import re
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from crewai import Agent, Crew, Process, Task
 
@@ -14,8 +15,10 @@ from multi_agent_engineering.orchestration.artifact_store import (
     ensure_callbacks_log,
     init_run_artifacts,
     read_json,
+    write_json,
 )
 from multi_agent_engineering.orchestration.manifest_applier import apply_manifest
+from multi_agent_engineering.orchestration.skeleton import ensure_python_skeleton
 
 
 def _norm_agent_token(s: str) -> str:
@@ -116,9 +119,8 @@ def run_spine(
     build_plan_path = Path(inputs["artifacts_dir"]) / "build_plan.json"
     build_plan_data = read_json(build_plan_path)
     build_plan = BuildPlan.model_validate(build_plan_data)  # pydantic v2; works in your env
-    # If the LLM omitted run_id, propagate the pipeline run_id for consistent logging.
-    if not getattr(build_plan, "run_id", ""):
-        build_plan.run_id = str(inputs.get("run_id", ""))
+    # Always use the pipeline run_id for consistency with artifacts/<run_id>/.
+    build_plan.run_id = str(inputs.get("run_id", ""))
     return build_plan
 
 
@@ -128,7 +130,7 @@ def run_dynamic_tasks(
     inputs: Dict[str, Any],
     run_artifacts: RunArtifacts,
     build_plan: BuildPlan,
-) -> list[FileManifest]:
+) -> tuple[list[FileManifest], list[dict]]:
     """
     Instantiate and execute dynamic tasks based on BuildPlan.planned_tasks.
     Each dynamic task must output a FileManifest (JSON).
@@ -145,6 +147,7 @@ def run_dynamic_tasks(
     }
 
     manifests: list[FileManifest] = []
+    task_results: list[dict] = []
     manifests_dir = run_artifacts.artifacts_dir / "manifests"
     manifests_dir.mkdir(parents=True, exist_ok=True)
 
@@ -175,39 +178,74 @@ def run_dynamic_tasks(
             output_file=str((manifests_dir / f"{planned.task_id}.json").as_posix()),
         )
 
-        c = Crew(agents=[agent], tasks=[dynamic_task], process=Process.sequential, verbose=True)
-        result = c.kickoff(inputs=inputs)
+        manifest_path = manifests_dir / f"{planned.task_id}.json"
+        try:
+            c = Crew(agents=[agent], tasks=[dynamic_task], process=Process.sequential, verbose=True)
+            c.kickoff(inputs=inputs)
 
-        # Prefer reading the persisted manifest file for determinism.
-        manifest_data = read_json(manifests_dir / f"{planned.task_id}.json")
-        manifest = FileManifest.model_validate(manifest_data)
-        manifests.append(manifest)
+            # Prefer reading the persisted manifest file for determinism.
+            manifest_data = read_json(manifest_path)
+            manifest = FileManifest.model_validate(manifest_data)
+            manifests.append(manifest)
 
-        append_callback(
-            callbacks_log,
-            {
-                "run_id": build_plan.run_id,
-                "task_id": planned.task_id,
-                "agent": owner_agent_id,
-                "status": "success",
-                "artifact_paths": [str((manifests_dir / f"{planned.task_id}.json").as_posix())],
-                "blocking_issues": [],
-            },
-        )
+            append_callback(
+                callbacks_log,
+                {
+                    "run_id": build_plan.run_id,
+                    "task_id": planned.task_id,
+                    "agent": owner_agent_id,
+                    "status": "success",
+                    "artifact_paths": [manifest_path.as_posix()],
+                    "blocking_issues": [],
+                },
+            )
+            task_results.append(
+                {
+                    "task_id": planned.task_id,
+                    "agent": owner_agent_id,
+                    "status": "success",
+                    "manifest_path": manifest_path.as_posix(),
+                    "blocking_issues": [],
+                }
+            )
+        except Exception as e:
+            blocking = [str(e)]
+            append_callback(
+                callbacks_log,
+                {
+                    "run_id": build_plan.run_id,
+                    "task_id": planned.task_id,
+                    "agent": owner_agent_id,
+                    "status": "failed",
+                    "artifact_paths": [manifest_path.as_posix()],
+                    "blocking_issues": blocking,
+                },
+            )
+            task_results.append(
+                {
+                    "task_id": planned.task_id,
+                    "agent": owner_agent_id,
+                    "status": "failed",
+                    "manifest_path": manifest_path.as_posix(),
+                    "blocking_issues": blocking,
+                }
+            )
 
-    return manifests
+    return manifests, task_results
 
 
 def apply_manifests(
     *,
     run_artifacts: RunArtifacts,
     manifests: list[FileManifest],
-) -> list[str]:
+) -> tuple[list[str], list[str]]:
     written: list[str] = []
+    warnings: list[str] = []
     for m in manifests:
-        paths = apply_manifest(m, run_artifacts.generated_app_dir)
-        written.extend([p.as_posix() for p in paths])
-    return written
+        result = apply_manifest(m, run_artifacts.generated_app_dir)
+        written.extend([p.as_posix() for p in result.written])
+        warnings.extend(result.warnings)
+    return written, warnings
 
 
 def run_full_pipeline(
@@ -216,15 +254,36 @@ def run_full_pipeline(
     project_root: Path,
     inputs: Dict[str, Any],
 ) -> Dict[str, Any]:
+    started_at = datetime.now(timezone.utc).isoformat()
     run_id = inputs.get("run_id") or ""
     if not run_id:
         raise ValueError("inputs must include run_id (created in main.py)")
 
     run_artifacts = init_run_artifacts(project_root, run_id=run_id)
     build_plan = run_spine(crew_factory=crew_factory, inputs=inputs, run_artifacts=run_artifacts)
-    manifests = run_dynamic_tasks(
+    manifests, task_results = run_dynamic_tasks(
         crew_factory=crew_factory, inputs=inputs, run_artifacts=run_artifacts, build_plan=build_plan
     )
-    written = apply_manifests(run_artifacts=run_artifacts, manifests=manifests)
-    return {"run_id": run_id, "written_files": written, "artifacts_dir": run_artifacts.artifacts_dir.as_posix()}
+    written, apply_warnings = apply_manifests(run_artifacts=run_artifacts, manifests=manifests)
+
+    # Ensure baseline runnable Python skeleton exists (does not overwrite).
+    skeleton_written = ensure_python_skeleton(run_artifacts.generated_app_dir)
+    written.extend([p.as_posix() for p in skeleton_written])
+
+    summary = {
+        "run_id": run_id,
+        "started_at": started_at,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "artifacts_dir": run_artifacts.artifacts_dir.as_posix(),
+        "build_plan": {
+            "planned_tasks": [t.model_dump() for t in build_plan.planned_tasks],  # type: ignore[attr-defined]
+            "test_strategy": build_plan.test_strategy,
+            "integration_notes": build_plan.integration_notes,
+        },
+        "dynamic_tasks": task_results,
+        "written_files": sorted(set(written)),
+        "warnings": apply_warnings,
+    }
+    write_json(run_artifacts.artifacts_dir / "run_summary.json", summary)
+    return summary
 

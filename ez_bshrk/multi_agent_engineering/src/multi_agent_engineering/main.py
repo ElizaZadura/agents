@@ -55,7 +55,14 @@ def _resolve_spec_path() -> Path:
     - env var SPEC_FILE
     - default files in project root: spec.md, spec.txt
     """
-    if len(sys.argv) >= 2 and sys.argv[1].strip():
+    # Support explicit flag: --spec-file PATH (or -s PATH)
+    for i, arg in enumerate(sys.argv[1:], start=1):
+        if arg in ("--spec-file", "--spec", "-s"):
+            if i + 1 >= len(sys.argv):
+                raise FileNotFoundError(f"{arg} provided but no path value given")
+            return Path(sys.argv[i + 1]).expanduser()
+
+    if len(sys.argv) >= 2 and sys.argv[1].strip() and not sys.argv[1].startswith("-"):
         return Path(sys.argv[1]).expanduser()
 
     env_path = os.environ.get("SPEC_FILE", "").strip()
