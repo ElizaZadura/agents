@@ -99,6 +99,10 @@ This project loads `.env` with override semantics; confirm your `.env` is correc
 - File size is capped (to avoid huge accidental outputs).
 - If `content_mode="fenced_code"` is set but no fenced block is present, the pipeline writes the content literally and records a warning.
 
+## Design notes
+
+- Proposed changes discussion: `docs/proposed_changes_summary.txt`
+
 ## Summary of steps taken (high level)
 
 - Added **Pydantic output schemas** for `DesignPack`, `BuildPlan`, and `FileManifest`.

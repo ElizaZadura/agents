@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from crewai import Agent, Crew, Process, Task
 
@@ -13,7 +13,6 @@ from multi_agent_engineering.orchestration.artifact_store import (
     RunArtifacts,
     append_callback,
     ensure_callbacks_log,
-    init_run_artifacts,
     read_json,
     write_json,
 )
@@ -186,6 +185,10 @@ def run_dynamic_tasks(
             # Prefer reading the persisted manifest file for determinism.
             manifest_data = read_json(manifest_path)
             manifest = FileManifest.model_validate(manifest_data)
+            if manifest.task_id != planned.task_id:
+                raise ValueError(
+                    f"Manifest task_id {manifest.task_id!r} does not match planned task_id {planned.task_id!r}"
+                )
             manifests.append(manifest)
 
             append_callback(
@@ -251,15 +254,16 @@ def apply_manifests(
 def run_full_pipeline(
     *,
     crew_factory: Any,
-    project_root: Path,
+    run_artifacts: RunArtifacts,
     inputs: Dict[str, Any],
 ) -> Dict[str, Any]:
     started_at = datetime.now(timezone.utc).isoformat()
-    run_id = inputs.get("run_id") or ""
+    run_id = inputs.get("run_id") or run_artifacts.run_id
     if not run_id:
         raise ValueError("inputs must include run_id (created in main.py)")
+    if run_artifacts.run_id and run_artifacts.run_id != run_id:
+        raise ValueError("inputs run_id does not match run_artifacts.run_id")
 
-    run_artifacts = init_run_artifacts(project_root, run_id=run_id)
     build_plan = run_spine(crew_factory=crew_factory, inputs=inputs, run_artifacts=run_artifacts)
     manifests, task_results = run_dynamic_tasks(
         crew_factory=crew_factory, inputs=inputs, run_artifacts=run_artifacts, build_plan=build_plan
