@@ -7,6 +7,14 @@ from pathlib import Path
 from multi_agent_engineering.models.file_manifest import FileManifest
 
 
+
+
+BASELINE_FILES = {
+    "pyproject.toml",
+    "src/app/__init__.py",
+    "src/app/__main__.py",
+    "tests/test_smoke.py",
+}
 _FENCE_RE = re.compile(r"```[^\n]*\n([\s\S]*?)\n```", re.MULTILINE)
 
 
@@ -74,6 +82,9 @@ def apply_manifest(manifest: FileManifest, target_root: Path, *, max_bytes: int 
             raise ManifestApplyError(f"Unsafe path in manifest: {entry.path!r}")
         if _has_dotfile_segment(rel_path):
             raise ManifestApplyError(f"Dotfile paths are not allowed in manifest: {entry.path!r}")
+        if rel_path in BASELINE_FILES:
+            warnings.append(f"{entry.path}: baseline file write skipped")
+            continue
 
         out_path = (target_root / rel_path).resolve()
         if target_root not in out_path.parents and out_path != target_root:

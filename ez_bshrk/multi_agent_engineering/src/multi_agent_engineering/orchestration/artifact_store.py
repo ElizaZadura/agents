@@ -50,10 +50,6 @@ def append_callback(callbacks_log: Path, payload: Dict[str, Any]) -> None:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
-
-
 def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 

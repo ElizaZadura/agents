@@ -3,7 +3,6 @@ import os
 import sys
 import warnings
 
-from datetime import datetime, timezone
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
@@ -81,6 +80,39 @@ def _resolve_spec_path() -> Path:
     )
 
 
+def _prepare_run_context(
+    *,
+    root: Path,
+    spec_text: str | None,
+    spec_path: Path | None,
+    trigger_payload: dict | None = None,
+) -> tuple:
+    from multi_agent_engineering.orchestration.artifact_store import (
+        ensure_callbacks_log,
+        init_run_artifacts,
+        new_run_id,
+        write_spec,
+    )
+
+    run_id = new_run_id()
+    run_artifacts = init_run_artifacts(root, run_id=run_id)
+    if spec_text:
+        write_spec(run_artifacts.artifacts_dir, spec_text, filename="spec.md")
+    ensure_callbacks_log(run_artifacts.artifacts_dir)
+
+    inputs = {
+        "spec": spec_text or "",
+        "spec_path": str(spec_path) if spec_path else "",
+        "run_id": run_id,
+        # Used by tasks.yaml output_file paths.
+        "artifacts_dir": run_artifacts.artifacts_dir.as_posix(),
+    }
+    if trigger_payload is not None:
+        inputs["crewai_trigger_payload"] = trigger_payload
+
+    return run_artifacts, inputs
+
+
 def run():
     """
     Run the crew.
@@ -92,31 +124,16 @@ def run():
     spec_text = spec_path.read_text(encoding="utf-8")
 
     from multi_agent_engineering.crew import MultiAgentEngineering
-    from multi_agent_engineering.orchestration.artifact_store import (
-        ensure_callbacks_log,
-        init_run_artifacts,
-        new_run_id,
-        write_spec,
-    )
     from multi_agent_engineering.orchestration.pipeline import run_full_pipeline
 
-    run_id = new_run_id()
-    run_artifacts = init_run_artifacts(root, run_id=run_id)
-    write_spec(run_artifacts.artifacts_dir, spec_text, filename="spec.md")
-    ensure_callbacks_log(run_artifacts.artifacts_dir)
-
-    inputs = {
-        "spec": spec_text,
-        "spec_path": str(spec_path),
-        "run_id": run_id,
-        # Used by tasks.yaml output_file paths.
-        "artifacts_dir": run_artifacts.artifacts_dir.as_posix(),
-    }
+    run_artifacts, inputs = _prepare_run_context(
+        root=root, spec_text=spec_text, spec_path=spec_path
+    )
 
     try:
         run_full_pipeline(
             crew_factory=MultiAgentEngineering,
-            project_root=root,
+            run_artifacts=run_artifacts,
             inputs=inputs,
         )
     except Exception as e:
@@ -134,23 +151,8 @@ def train():
     spec_text = spec_path.read_text(encoding="utf-8")
 
     from multi_agent_engineering.crew import MultiAgentEngineering
-    from multi_agent_engineering.orchestration.artifact_store import (
-        ensure_callbacks_log,
-        init_run_artifacts,
-        new_run_id,
-        write_spec,
-    )
 
-    run_id = new_run_id()
-    run_artifacts = init_run_artifacts(root, run_id=run_id)
-    write_spec(run_artifacts.artifacts_dir, spec_text, filename="spec.md")
-    ensure_callbacks_log(run_artifacts.artifacts_dir)
-    inputs = {
-        "spec": spec_text,
-        "spec_path": str(spec_path),
-        "run_id": run_id,
-        "artifacts_dir": run_artifacts.artifacts_dir.as_posix(),
-    }
+    _, inputs = _prepare_run_context(root=root, spec_text=spec_text, spec_path=spec_path)
     try:
         MultiAgentEngineering().crew().train(n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs)
 
@@ -181,23 +183,8 @@ def test():
     spec_text = spec_path.read_text(encoding="utf-8")
 
     from multi_agent_engineering.crew import MultiAgentEngineering
-    from multi_agent_engineering.orchestration.artifact_store import (
-        ensure_callbacks_log,
-        init_run_artifacts,
-        new_run_id,
-        write_spec,
-    )
 
-    run_id = new_run_id()
-    run_artifacts = init_run_artifacts(root, run_id=run_id)
-    write_spec(run_artifacts.artifacts_dir, spec_text, filename="spec.md")
-    ensure_callbacks_log(run_artifacts.artifacts_dir)
-    inputs = {
-        "spec": spec_text,
-        "spec_path": str(spec_path),
-        "run_id": run_id,
-        "artifacts_dir": run_artifacts.artifacts_dir.as_posix(),
-    }
+    _, inputs = _prepare_run_context(root=root, spec_text=spec_text, spec_path=spec_path)
 
     try:
         MultiAgentEngineering().crew().test(n_iterations=int(sys.argv[1]), eval_llm=sys.argv[2], inputs=inputs)
@@ -229,26 +216,13 @@ def run_with_trigger():
         spec_text = Path(spec_path).expanduser().read_text(encoding="utf-8")
 
     from multi_agent_engineering.crew import MultiAgentEngineering
-    from multi_agent_engineering.orchestration.artifact_store import (
-        ensure_callbacks_log,
-        init_run_artifacts,
-        new_run_id,
-        write_spec,
+
+    _, inputs = _prepare_run_context(
+        root=root,
+        spec_text=spec_text,
+        spec_path=Path(spec_path).expanduser() if spec_path else None,
+        trigger_payload=trigger_payload,
     )
-
-    run_id = new_run_id()
-    run_artifacts = init_run_artifacts(root, run_id=run_id)
-    if spec_text:
-        write_spec(run_artifacts.artifacts_dir, spec_text, filename="spec.md")
-    ensure_callbacks_log(run_artifacts.artifacts_dir)
-
-    inputs = {
-        "crewai_trigger_payload": trigger_payload,
-        "spec": spec_text or "",
-        "spec_path": str(spec_path) if spec_path else "",
-        "run_id": run_id,
-        "artifacts_dir": run_artifacts.artifacts_dir.as_posix(),
-    }
 
     try:
         result = MultiAgentEngineering().crew().kickoff(inputs=inputs)
