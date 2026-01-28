@@ -2,6 +2,8 @@ from autogen_core import MessageContext, RoutedAgent, message_handler
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.messages import TextMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+from autogen_ext.models.ollama import OllamaChatCompletionClient
+from autogen_ext.models.anthropic import AnthropicChatCompletionClient
 import messages
 from autogen_core import TRACE_LOGGER_NAME
 import importlib
@@ -11,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(TRACE_LOGGER_NAME)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
@@ -22,21 +24,36 @@ class Creator(RoutedAgent):
     # Change this system message to reflect the unique characteristics of this agent
 
     system_message = """
-    You are an Agent that is able to create new AI Agents.
-    You receive a template in the form of Python code that creates an Agent using Autogen Core and Autogen Agentchat.
-    You should use this template to create a new Agent with a unique system message that is different from the template,
-    and reflects their unique characteristics, interests and goals.
-    You can choose to keep their overall goal the same, or change it.
-    You can choose to take this Agent in a completely different direction. The only requirement is that the class must be named Agent,
-    and it must inherit from RoutedAgent and have an __init__ method that takes a name parameter.
-    Also avoid environmental interests - try to mix up the business verticals so that every agent is different.
-    Respond only with the python code, no other text, and no markdown code blocks.
-    """
+You are an Agent that creates new AI Agents.
+
+You will be given a Python template. You must output a complete Python module that defines exactly one class named Agent.
+Requirements:
+- The file must be valid Python (must parse).
+- The first line of your output MUST start at column 1 (no leading spaces).
+- Do NOT output any prose or commentary.
+- Do NOT output Markdown or code fences (no ```).
+- The first non-empty line MUST begin with either: from, import, or class.
+
+Agent requirements:
+- class name: Agent
+- inherits: RoutedAgent
+- __init__(self, name: str) present and calls super().__init__(name)
+- includes a system_message string for the delegate AssistantAgent
+- decision bias: choose exactly ONE from:
+  contrarian | risk-averse | numbers-first | narrative-first | adversarial | minimalist
+  The bias MUST be stated explicitly in the system message and MUST affect how the agent evaluates ideas.
+- System message must be operational rules (constraints/heuristics), not a persona biography.
+- Avoid environmental topics. Mix business verticals across agents.
+
+If you cannot comply with the formatting rules, output exactly:
+raise SystemExit("FORMAT_ERROR")
+"""
+
 
 
     def __init__(self, name) -> None:
         super().__init__(name)
-        model_client = OpenAIChatCompletionClient(model="gpt-4o-mini", temperature=1.0)
+        model_client = AnthropicChatCompletionClient(model="claude-sonnet-4-5-20250929", temperature=1.0)
         self._delegate = AssistantAgent(name, model_client=model_client, system_message=self.system_message)
 
     def get_user_prompt(self):
