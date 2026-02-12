@@ -5,7 +5,7 @@ A refactored research agent with source quality controls and evidence-backed cla
 ## Quick Start
 
 ```bash
-cd docs_ez/deep_research_lab
+./deep_research_lab
 python app.py
 ```
 

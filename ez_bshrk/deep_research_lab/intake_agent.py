@@ -29,7 +29,7 @@ questions_agent = Agent(
     name="IntakeQuestionsAgent",
     instructions=QUESTIONS_INSTRUCTIONS,
     model="gpt-4o-mini",
-    output_type=AgentOutputSchema(FollowUpQuestions, strict_json_schema=False),
+    output_type=AgentOutputSchema(FollowUpQuestions, strict_json_schema=True),
 )
 
 
