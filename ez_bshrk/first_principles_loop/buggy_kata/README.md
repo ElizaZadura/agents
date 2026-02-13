@@ -1,18 +1,8 @@
 # Buggy Kata
 
-A minimal Python repo for practicing writing agent loops. Contains 4 utility functions with intentionally seeded bugs and a pytest test suite to verify fixes.
+A minimal Python repo for practicing writing agent loops. Contains 4 utility functions with intentionally seeded bugs and a pytest test suite to verify fixes. Run the agent loop from the `agent_tool_loop.py` file, or the `agent_tool_loop.ipynb` notebook.
 
-## Setup
-
-```bash
-pip install -r requirements.txt
-```
-
-## Running Tests
-
-```bash
-pytest -v
-```
+Note: at the end, you can reset the repo to the initial state by running `reset_buggy_kata()` in the `agent_tool_loop.py` file.
 
 ## The Challenge
 
@@ -25,7 +15,7 @@ This repo contains 4 utility functions, each with a bug:
 | `find_max(items)` | Find the maximum value in a list | Buggy |
 | `word_count(text)` | Count words in a text | Buggy |
 
-Your agent should:
+### Your agent should
 
 1. Run `pytest -v` to see which tests fail
 2. Read the failing test output to understand the bug
@@ -37,7 +27,7 @@ Your agent should:
 When you first run the tests, you should see **7 failing tests** from 4 bugs:
 
 | Bug | Failing Tests |
-|-----|---------------|
+| :---: | :---: |
 | `reverse_string` drops last char | `test_reverse_simple`, `test_reverse_single_char`, `test_reverse_palindrome` |
 | `is_prime(1)` returns True | `test_edge_cases` |
 | `find_max` returns minimum | `test_find_max_positive`, `test_find_max_negative` |
