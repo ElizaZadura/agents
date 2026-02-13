@@ -3,7 +3,6 @@ Utility functions for the buggy kata practice repo.
 Each function contains an intentional bug for agent loop practice.
 """
 
-import re
 
 def reverse_string(s: str) -> str:
     """
@@ -15,7 +14,9 @@ def reverse_string(s: str) -> str:
     Returns:
         The reversed string
     """
-    return s[::-1]  # Correctly reverses the entire string
+    if not s:
+        return s
+    return s[::-1]
 
 
 def is_prime(n: int) -> bool:
@@ -55,7 +56,7 @@ def find_max(items: list) -> any:
     
     result = items[0]
     for item in items[1:]:
-        if item > result:  # Corrects the comparison to find max
+        if item > result:
             result = item
     return result
 
@@ -72,7 +73,6 @@ def word_count(text: str) -> int:
     """
     if not text:
         return 0
-    # removes punctuation and splits by whitespace
-    clean_text = re.sub(r'[\W_]+', ' ', text)  
-    words = clean_text.split()  # Splits considering whitespaces
+    import re
+    words = re.findall(r'\b\w+\b', text)
     return len(words)

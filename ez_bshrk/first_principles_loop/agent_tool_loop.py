@@ -67,14 +67,11 @@ MAX_ITERATIONS = 15
 
 
 def reset_buggy_kata():
-    """Reset utils.py to its original buggy state for re-running the exercise."""
-    import shutil
-    from pathlib import Path
+    """Reset buggy_kata by running the dedicated reset helper."""
+    from buggy_kata.reset_kata import reset_buggy_kata_state
 
-    src = Path.cwd() / "buggy_kata/src/utils_buggy_original.py"
-    dst = Path.cwd() / "buggy_kata/src/utils.py"
-    shutil.copy(src, dst)
-    print("✅ Reset buggy_kata/src/utils.py to original buggy state!")
+    restored_file = reset_buggy_kata_state()
+    print(f"✅ Reset complete: {restored_file}")
 
 
 # %%
@@ -129,14 +126,31 @@ def run_tests(folder_path: str) -> str:
     return output
 
 
+def resolve_code_path(file_path: str) -> Path:
+    """
+    Resolve tool-provided file paths and tolerate common buggy_kata aliases.
+    """
+    raw = Path(file_path)
+    abs_path = raw if raw.is_absolute() else WORKSPACE_ROOT / raw
+    if abs_path.exists():
+        return abs_path
+
+    # Common model alias: buggy_kata/utils.py -> buggy_kata/src/utils.py
+    rel = abs_path.relative_to(WORKSPACE_ROOT) if abs_path.is_relative_to(WORKSPACE_ROOT) else raw
+    rel_str = rel.as_posix()
+    if rel_str.startswith("buggy_kata/") and "/src/" not in rel_str:
+        alias = WORKSPACE_ROOT / "buggy_kata" / "src" / Path(rel_str).name
+        if alias.exists() or alias.parent.exists():
+            return alias
+
+    return abs_path
+
+
 def read_file(file_path: str) -> str:
     """
     Read and return the contents of a file.
     """
-    # Resolve to absolute path if relative
-    abs_path = Path(file_path)
-    if not abs_path.is_absolute():
-        abs_path = WORKSPACE_ROOT / file_path
+    abs_path = resolve_code_path(file_path)
 
     with open(abs_path, "r", encoding="utf-8") as f:
         return f.read()
@@ -147,10 +161,7 @@ def write_file(file_path: str, content: str) -> str:
     Write content to a file, overwriting any existing content.
     Returns confirmation message.
     """
-    # Resolve to absolute path if relative
-    abs_path = Path(file_path)
-    if not abs_path.is_absolute():
-        abs_path = WORKSPACE_ROOT / file_path
+    abs_path = resolve_code_path(file_path)
 
     with open(abs_path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -162,7 +173,7 @@ def write_file(file_path: str, content: str) -> str:
 
 run_tests_json = {
     "name": "run_tests",
-    "description": "Run pytest on the tests folder within the target folder. Returns test output with pass/fail results and any error tracebacks.",
+    "description": "Run pytest in buggy_kata/tests and return pass/fail output with tracebacks.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -178,13 +189,13 @@ run_tests_json = {
 
 read_file_json = {
     "name": "read_file",
-    "description": "Read and return the contents of a file.",
+    "description": "Read and return file contents. For source code, prefer buggy_kata/src/utils.py.",
     "parameters": {
         "type": "object",
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "Path to the file to read",
+                "description": "Path to read. Use buggy_kata/src/utils.py for fixes and buggy_kata/tests/test_utils.py for context.",
             }
         },
         "required": ["file_path"],
@@ -194,13 +205,13 @@ read_file_json = {
 
 write_file_json = {
     "name": "write_file",
-    "description": "Write content to a file, overwriting any existing content.",
+    "description": "Write full content to a file. Only modify buggy_kata/src/utils.py.",
     "parameters": {
         "type": "object",
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "Path to the file to write",
+                "description": "Path to write. Use buggy_kata/src/utils.py.",
             },
             "content": {
                 "type": "string",
@@ -348,6 +359,7 @@ def loop(messages):
     """
     iteration = 0
     done = False
+    last_response_id = None
 
     show("[bold magenta]🤖 Bug-Fixing Agent Started[/bold magenta]")
     show(f"[dim]Target: {TARGET_FOLDER} | Max iterations: {MAX_ITERATIONS}[/dim]\n")
@@ -360,7 +372,10 @@ def loop(messages):
             model="gpt-4o",
             messages=messages,
             tools=tools,
+            store=True,
+            metadata={"run_mode": "with_trace"},
         )
+        last_response_id = response.id
 
         finish_reason = response.choices[0].finish_reason
         message = response.choices[0].message
@@ -383,6 +398,15 @@ def loop(messages):
             if message.content:
                 show("[bold]Summary:[/bold]")
                 show(message.content)
+
+            # Surface trace/log lookup details at the end of each run
+            if last_response_id:
+                show(f"[dim]Trace ID: {last_response_id}[/dim]")
+                show(
+                    f"[dim]View trace: https://platform.openai.com/logs?api=chat-completions&id={last_response_id}[/dim]"
+                )
+            else:
+                show("[dim]View traces: https://platform.openai.com/logs?api=chat-completions[/dim]")
 
     if iteration >= MAX_ITERATIONS:
         show(f"\n[bold red]⚠️  Reached max iterations ({MAX_ITERATIONS})[/bold red]")
@@ -490,16 +514,22 @@ def show_summary(messages):
 
 # %%
 system_message = f"""
-You are given a codebase with bugs. Please fix them.
+You are given a buggy kata. Fix failing tests with minimal edits.
 
 Target folder: {TARGET_FOLDER}
+
+Important constraints:
+- Run tests from {TARGET_FOLDER}.
+- Read tests from {TARGET_FOLDER}/tests/test_utils.py when needed.
+- Only edit {TARGET_FOLDER}/src/utils.py.
+- Do not edit files outside {TARGET_FOLDER}/src/utils.py.
 """
 
 messages = [
     {"role": "system", "content": system_message},
     {
         "role": "user",
-        "content": "Please fix all the bugs in the codebase.",
+        "content": "Please fix all failing tests with trace. Start by running tests, then only edit buggy_kata/src/utils.py.",
     },
 ]
 
@@ -526,7 +556,7 @@ messages = [
 #     {"role": "system", "content": system_message},
 #     {
 #         "role": "user",
-#         "content": "Please fix all the bugs in the codebase. Start by running the tests.",
+#         "content": "Please fix all failing tests with trace. Start by running tests, then only edit buggy_kata/src/utils.py.",
 #     },
 # ]
 
@@ -546,5 +576,5 @@ format_conversation(result)
 show_summary(result)
 
 # %%
-# To reset and run again, uncomment and run this cell:
-# reset_buggy_kata()
+# Reset command (no uncommenting needed):
+# python buggy_kata/reset_kata.py

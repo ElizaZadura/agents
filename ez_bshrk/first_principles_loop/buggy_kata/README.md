@@ -2,7 +2,8 @@
 
 A minimal Python repo for practicing writing agent loops. Contains 4 utility functions with intentionally seeded bugs and a pytest test suite to verify fixes. Run the agent loop from the `agent_tool_loop.py` file, or the `agent_tool_loop.ipynb` notebook.
 
-Note: at the end, you can reset the repo to the initial state by running `reset_buggy_kata()` in the `agent_tool_loop.py` file.
+Reset to the initial buggy state anytime with:
+`python buggy_kata/reset_kata.py`
 
 ## The Challenge
 
